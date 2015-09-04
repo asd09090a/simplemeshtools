@@ -1,6 +1,5 @@
-// some simple binary filtering to create a mask of the 
-// head, filled in as best as possible.
-
+// Try to locate the highest gradient near the surface of the scalp.
+// Uses a marker derived from a presurgical scan
 #include <iostream>
 #include <cstdio>
 #include <vector>
@@ -9,15 +8,16 @@
 
 #include "ioutils.h"
 #include <itkBinaryShapeOpeningImageFilter.h>
-#include <itkGradientMagnitudeImageFilter.h>
-#include <itkOtsuThresholdImageFilter.h>
+#include <itkGradientMagnitudeRecursiveGaussianImageFilter.h>
 #include <itkMaskImageFilter.h>
 #include "itkBinaryDilateParaImageFilter.h"
-#include "itkBinaryCloseParaImageFilter.h"
-#include "itkBinaryOpenParaImageFilter.h"
+#include "itkBinaryErodeParaImageFilter.h"
+#include <itkMaximumImageFilter.h>
 #include "itkBinaryFillholeImageFilter.h"
 #include <itkSubtractImageFilter.h>
 #include <itkBinaryShapeKeepNObjectsImageFilter.h>
+#include <itkMorphologicalWatershedFromMarkersImageFilter.h>
+
 #include <itkSmartPointer.h>
 namespace itk
 {
@@ -32,8 +32,8 @@ public:
 typedef class CmdLineType
 {
 public:
-  std::string InputIm, OutputIm;
-  float  smallclose, largeopen, dilatesize;
+  std::string InputIm, OutputIm, MaskIm;
+  float  erodesize, dilatesize, smoothsize;
 } CmdLineType;
 
 bool debug=false;
@@ -57,7 +57,7 @@ void ParseCmdLine(int argc, char* argv[],
   try
     {
     // Define the command line object.
-    CmdLine cmd("mkHeadMask", ' ', "0.9");
+    CmdLine cmd("mkSurf", ' ', "0.9");
 
     ValueArg<std::string> inArg("i","input","T1 input image",true,"result","string");
     cmd.add( inArg );
@@ -65,17 +65,18 @@ void ParseCmdLine(int argc, char* argv[],
     ValueArg<std::string> outArg("o","output","output image",true,"result","string");
     cmd.add( outArg );
 
+    ValueArg<std::string> maskArg("m","mask","mask image - used to generate markers",true,"result","string");
+    cmd.add( maskArg );
 
+    ValueArg<float> smoothArg("", "smallclose", "size of small gradient smoothing (mm)", false, 2, "float");
+    cmd.add(smoothArg);
 
-    ValueArg<float> scloseArg("", "smallclose", "size of small closing (mm)", false, 15, "float");
-    cmd.add(scloseArg);
+    ValueArg<float> eroArg("", "erode", "size of erosion to create marker(mm)", 
+                              false, 3, "float");
+    cmd.add(eroArg);
 
-    ValueArg<float> lcloseArg("", "largeopen", "size of large opening (mm)", 
-                              false, 10, "float");
-    cmd.add(lcloseArg);
-
-    ValueArg<float> dilArg("", "dilate", "size of final dilate (mm)", 
-                              false, 5, "float");
+    ValueArg<float> dilArg("", "dilate", "size of dilation background marker (mm)", 
+                              false, 3, "float");
     cmd.add(dilArg);
 
     SwitchArg debugArg("d", "debug", "save debug images", debug);
@@ -86,9 +87,10 @@ void ParseCmdLine(int argc, char* argv[],
 
     CmdLineObj.InputIm = inArg.getValue();
     CmdLineObj.OutputIm = outArg.getValue();
+    CmdLineObj.MaskIm = maskArg.getValue();
     debug = debugArg.getValue();
-    CmdLineObj.smallclose = scloseArg.getValue();
-    CmdLineObj.largeopen = lcloseArg.getValue();
+    CmdLineObj.erodesize = eroArg.getValue();
+    CmdLineObj.smoothsize = smoothArg.getValue();
     CmdLineObj.dilatesize = dilArg.getValue();
     }
   catch (ArgException &e)  // catch any exceptions
@@ -109,45 +111,51 @@ void doSeg(const CmdLineType &CmdLineObj)
   typedef typename MaskImType::Pointer MIPtr;
 
   IPtr T1 = readIm<ImageType>(CmdLineObj.InputIm);
+  MIPtr mask = readIm<MaskImType>(CmdLineObj.MaskIm);
 
-  // threshold first
-  itk::Instance<itk::OtsuThresholdImageFilter <ImageType, MaskImType> > Thresh;
-  Thresh->SetInput(T1);
-  Thresh->SetInsideValue(0);
-  Thresh->SetOutsideValue(1);
+  // fill holes
+  itk::Instance<itk::BinaryFillholeImageFilter<MaskImType > > Fill;
+  Fill->SetInput(mask);
+  // set up the marker
+  itk::Instance<itk::BinaryErodeParaImageFilter<MaskImType> > Erode;
+  itk::Instance<itk::BinaryDilateParaImageFilter<MaskImType> > Dilate;
 
-  // small closing
-  itk::Instance<itk::BinaryCloseParaImageFilter<MaskImType> > smClose;
-  itk::Instance<itk::BinaryOpenParaImageFilter<MaskImType> > lgOpen;
+  Erode->SetInput(Fill->GetOutput());
+  Erode->SetRadius(CmdLineObj.erodesize);
+  Erode->SetUseImageSpacing(true);
 
-  smClose->SetInput(Thresh->GetOutput());
-  smClose->SetRadius(CmdLineObj.smallclose);
-  smClose->SetUseImageSpacing(true);
-  // writeIm<MaskImType>(smClose->GetOutput(), CmdLineObj.OutputIm);
-  // return;
+  Dilate->SetInput(Fill->GetOutput());
+  Dilate->SetRadius(CmdLineObj.dilatesize);
+  Dilate->SetUseImageSpacing(true);
+  
+  itk::Instance<itk::BinaryThresholdImageFilter<MaskImType,MaskImType> > Invert;
+  Invert->SetInput(Dilate->GetOutput());
+  Invert->SetUpperThreshold(0);
+  Invert->SetLowerThreshold(0);
+  Invert->SetInsideValue(2);
+  Invert->SetOutsideValue(0);
 
+  itk::Instance<itk::MaximumImageFilter<MaskImType, MaskImType, MaskImType> >Comb;
+  Comb->SetInput(Erode->GetOutput());
+  Comb->SetInput2(Invert->GetOutput());
 
-  lgOpen->SetInput(smClose->GetOutput());
-  lgOpen->SetRadius(CmdLineObj.largeopen);
-  lgOpen->SetUseImageSpacing(true);
+  itk::Instance< itk::GradientMagnitudeRecursiveGaussianImageFilter<ImageType, ImageType> > Grad;
+  Grad->SetInput(T1);
+  Grad->SetSigma(CmdLineObj.smoothsize);
 
+  itk::Instance<itk::MorphologicalWatershedFromMarkersImageFilter<ImageType, MaskImType> > WS;
+  WS->SetInput(Grad->GetOutput());
+  WS->SetMarkerImage(Comb->GetOutput());
+  WS->SetMarkWatershedLine(false);
 
-  itk::Instance<itk::BinaryShapeKeepNObjectsImageFilter <MaskImType> > Biggest;
-  Biggest->SetInput(lgOpen->GetOutput());
-  Biggest->SetForegroundValue(1);
-  Biggest->SetNumberOfObjects(1);
+  itk::Instance<itk::BinaryThresholdImageFilter<MaskImType,MaskImType> > Select;
+  Select->SetInput(WS->GetOutput());
+  Select->SetUpperThreshold(1);
+  Select->SetLowerThreshold(1);
+  Select->SetInsideValue(1);
+  Select->SetOutsideValue(0);
 
-  if (CmdLineObj.dilatesize > 0) 
-    {
-    itk::Instance<itk::BinaryDilateParaImageFilter<MaskImType> > Dilate;
-    Dilate->SetInput(Biggest->GetOutput());
-    Dilate->SetRadius(CmdLineObj.dilatesize);
-    writeIm<MaskImType>(Dilate->GetOutput(), CmdLineObj.OutputIm);
-    }
-  else
-    {
-    writeIm<MaskImType>(Biggest->GetOutput(), CmdLineObj.OutputIm);
-    }
+  writeIm<MaskImType>(Select->GetOutput(), CmdLineObj.OutputIm);
 }
 
 int main(int argc, char * argv[])
