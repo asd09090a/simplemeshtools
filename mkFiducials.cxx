@@ -167,11 +167,16 @@ void doSeg(const CmdLineType &CmdLineObj)
   Biggest->SetForegroundValue(1);
   Biggest->SetNumberOfObjects(3);
 
+  itk::Instance<itk::BinaryShapeOpeningImageFilter<MaskImType> > SizeFilt;
+  SizeFilt->SetInput(Biggest->GetOutput());
+  SizeFilt->SetLambda(10);
+  SizeFilt->SetForegroundValue(1);
+
   // write out the centroids
   typedef typename itk::BinaryImageToShapeLabelMapFilter<MaskImType> LabellerType;
 
   typename LabellerType::Pointer Labeller = LabellerType::New();
-  Labeller->SetInput(Biggest->GetOutput());
+  Labeller->SetInput(SizeFilt->GetOutput());
   Labeller->SetInputForegroundValue(1);
   Labeller->SetFullyConnected(true);
 
