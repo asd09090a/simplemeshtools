@@ -4,11 +4,12 @@
 #include <cstdio>
 #include <vector>
 
+#define DIRGRAD
+
 #include "tclap/CmdLine.h"
 
 #include "ioutils.h"
 #include <itkBinaryShapeOpeningImageFilter.h>
-#include <itkGradientMagnitudeRecursiveGaussianImageFilter.h>
 #include <itkMaskImageFilter.h>
 #include "itkBinaryDilateParaImageFilter.h"
 #include "itkBinaryErodeParaImageFilter.h"
@@ -18,6 +19,16 @@
 #include <itkBinaryShapeKeepNObjectsImageFilter.h>
 #include <itkMorphologicalWatershedFromMarkersImageFilter.h>
 
+#ifdef DIRGRAD
+
+#include "itkDirectionalGradientImageFilter.h"
+#include <itkSmoothingRecursiveGaussianImageFilter.h>
+
+#else
+
+#include <itkGradientMagnitudeRecursiveGaussianImageFilter.h>
+
+#endif
 #include <itkSmartPointer.h>
 namespace itk
 {
@@ -68,7 +79,7 @@ void ParseCmdLine(int argc, char* argv[],
     ValueArg<std::string> maskArg("m","mask","mask image - used to generate markers",true,"result","string");
     cmd.add( maskArg );
 
-    ValueArg<float> smoothArg("", "smallclose", "size of small gradient smoothing (mm)", false, 2, "float");
+    ValueArg<float> smoothArg("", "smoothing", "size of small gradient smoothing (mm)", false, 2, "float");
     cmd.add(smoothArg);
 
     ValueArg<float> eroArg("", "erode", "size of erosion to create marker(mm)", 
@@ -139,10 +150,23 @@ void doSeg(const CmdLineType &CmdLineObj)
   Comb->SetInput(Erode->GetOutput());
   Comb->SetInput2(Invert->GetOutput());
 
+  // Directional gradient
+#ifdef DIRGRAD
+  itk::Instance< itk::DirectionalGradientImageFilter<ImageType, MaskImType, ImageType> > GradD;
+  GradD->SetInput(T1);
+  GradD->SetMaskImage(mask);
+  GradD->SetOutsideValue(0);
+  // No need to threshold (marker will cover most of the negative
+  // bits), but do smooth a little - name the smoother Grad to keep
+  // following code simple.
+  itk::Instance< itk::SmoothingRecursiveGaussianImageFilter <ImageType, ImageType> > Grad;
+  Grad->SetInput(GradD->GetOutput());
+  Grad->SetSigma(CmdLineObj.smoothsize);
+#else  
   itk::Instance< itk::GradientMagnitudeRecursiveGaussianImageFilter<ImageType, ImageType> > Grad;
   Grad->SetInput(T1);
   Grad->SetSigma(CmdLineObj.smoothsize);
-
+#endif
   itk::Instance<itk::MorphologicalWatershedFromMarkersImageFilter<ImageType, MaskImType> > WS;
   WS->SetInput(Grad->GetOutput());
   WS->SetMarkerImage(Comb->GetOutput());
@@ -156,6 +180,7 @@ void doSeg(const CmdLineType &CmdLineObj)
   Select->SetOutsideValue(0);
 
   writeIm<MaskImType>(Select->GetOutput(), CmdLineObj.OutputIm);
+  //writeIm<ImageType>(Grad->GetOutput(), "/tmp/grad.nii.gz");
 }
 
 int main(int argc, char * argv[])

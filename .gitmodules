@@ -1,3 +1,6 @@
 [submodule "tclap-code"]
 	path = tclap-code
 	url = git://git.code.sf.net/p/tclap/code
+[submodule "DirectionalGradient"]
+	path = DirectionalGradient
+	url = git@github.com:richardbeare/DirectionalGradient.git

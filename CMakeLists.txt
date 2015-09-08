@@ -19,10 +19,12 @@ SET(TEST_COMMAND ${ITK_TEST_DRIVER} --add-before-env PATH ${CMAKE_CURRENT_BINARY
 #cmake install and check that a file named Find(Package).cmake exists
 SET(Required_Packages
   ITK
+  VTK
 )
 INCLUDE_DIRECTORIES(
   ${CMAKE_CURRENT_SOURCE_DIR}
   ${CMAKE_CURRENT_SOURCE_DIR}/tclap-code/include/
+   ${CMAKE_CURRENT_SOURCE_DIR}/DirectionalGradient
 )
 #this foreach loads all of the packages that you specified as required.
 #It shouldn't need to be modified.
@@ -77,6 +79,17 @@ ADD_EXECUTABLE(${CurrentExe} ${CurrentExe}.cxx)
 TARGET_LINK_LIBRARIES(${CurrentExe} ${Libraries})
 ENDFOREACH(CurrentExe)
 
+SET(Libraries
+${ITK_LIBRARIES}
+${VTK_LIBRARIES}
+)
+
+
+FOREACH(CurrentExe  "mkMesh")
+
+ADD_EXECUTABLE(${CurrentExe} ${CurrentExe}.cxx)
+TARGET_LINK_LIBRARIES(${CurrentExe} ${Libraries})
+ENDFOREACH(CurrentExe)
 
 #the following line is an example of how to add a test to your project.
 #Testname is the title for this particular test.  ExecutableToRun is the
