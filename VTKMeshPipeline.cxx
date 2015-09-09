@@ -174,7 +174,6 @@ VTKMeshPipeline<ImageType>
 
   if(m_UseGaussianSmoothing) 
     {    
-    std::cout << "Gaussian" << std::endl;
     // The Gaussian filter is enabled
     m_VTKGaussianFilter->SetInputConnection(pipeImageTail);
     pipeImageTail = m_VTKGaussianFilter->GetOutputPort();
@@ -204,7 +203,6 @@ VTKMeshPipeline<ImageType>
   // 3. Check if decimation is required
   if(m_UseDecimation)
     {
-    std::cout << "Decimation " << std::endl;
     // Decimate filter gets the pipe tail
     m_DecimateFilter->SetInputConnection(pipePolyTail);
     pipePolyTail = m_DecimateFilter->GetOutputPort();
@@ -229,7 +227,6 @@ VTKMeshPipeline<ImageType>
   // 5. Include/exclude mesh smoothing filter
   if(m_UseMeshSmoothing)
     {
-    std::cout << "Mesh smoothing" << std::endl;
     // Pipe smoothed output into the pipeline
     m_PolygonSmoothingFilter->SetInputConnection(pipePolyTail);
     pipePolyTail = m_PolygonSmoothingFilter->GetOutputPort();
