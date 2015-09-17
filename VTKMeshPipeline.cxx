@@ -322,7 +322,7 @@ VTKMeshPipeline<ImageType>
 
 
   // Update the VTK transform to match
-  m_Transform->SetMatrix(vtk2nii.data_block());
+  // m_Transform->SetMatrix(vtk2nii.data_block());
   //std::cout << vtk2nii;
   // Pass the transform to the transform filter
   m_TransformFilter->SetTransform(m_Transform);

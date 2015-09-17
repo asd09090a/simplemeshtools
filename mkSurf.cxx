@@ -180,7 +180,9 @@ void doSeg(const CmdLineType &CmdLineObj)
   Select->SetOutsideValue(0);
 
   writeIm<MaskImType>(Select->GetOutput(), CmdLineObj.OutputIm);
-  //writeIm<ImageType>(Grad->GetOutput(), "/tmp/grad.nii.gz");
+  writeIm<ImageType>(Grad->GetOutput(), "/tmp/grad.nii.gz");
+  writeIm<MaskImType>(Comb->GetOutput(), "/tmp/marker.nii.gz");
+
 }
 
 int main(int argc, char * argv[])

@@ -84,8 +84,9 @@ ${ITK_LIBRARIES}
 ${VTK_LIBRARIES}
 )
 
+## VTK tools
 
-FOREACH(CurrentExe  "mkMesh")
+FOREACH(CurrentExe  "mkMesh" "clipMesh" "computeSurfDist")
 
 ADD_EXECUTABLE(${CurrentExe} ${CurrentExe}.cxx)
 TARGET_LINK_LIBRARIES(${CurrentExe} ${Libraries})
