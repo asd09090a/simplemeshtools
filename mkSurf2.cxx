@@ -1,5 +1,8 @@
-// Try to locate the highest gradient near the surface of the scalp.
-// Uses a marker derived from a presurgical scan
+// 3 Stage version - first is the largest increasing edge, then the
+// brightest point (fat), followed by a little dilation and the
+// largest decreasing edge. The trick is how to define that dilation.
+// I might just have to define it on a case by case basis.
+
 #include <iostream>
 #include <cstdio>
 #include <vector>
@@ -19,6 +22,7 @@
 #include <itkBinaryShapeKeepNObjectsImageFilter.h>
 #include <itkMorphologicalWatershedFromMarkersImageFilter.h>
 #include <itkThresholdImageFilter.h>
+#include <itkLabelSetDilateImageFilter.h>
 
 #ifdef DIRGRAD
 
@@ -45,7 +49,7 @@ typedef class CmdLineType
 {
 public:
   std::string InputIm, OutputIm, MaskIm, FiducialIm;
-  float  erodesize, dilatesize, smoothsize;
+  float  erodesize, dilatesize, dilatesize2, smoothsize;
   bool LightToDark;
 } CmdLineType;
 
@@ -95,6 +99,10 @@ void ParseCmdLine(int argc, char* argv[],
                               false, 3, "float");
     cmd.add(dilArg);
 
+    ValueArg<float> dil2Arg("", "dilate2", "size of dilation for bright fat surface (mm)",
+			   false, 3, "float");
+    cmd.add(dil2Arg);
+
     SwitchArg debugArg("d", "debug", "save debug images", debug);
     cmd.add( debugArg );
 
@@ -113,6 +121,7 @@ void ParseCmdLine(int argc, char* argv[],
     CmdLineObj.erodesize = eroArg.getValue();
     CmdLineObj.smoothsize = smoothArg.getValue();
     CmdLineObj.dilatesize = dilArg.getValue();
+    CmdLineObj.dilatesize2 = dil2Arg.getValue();
     CmdLineObj.LightToDark = !signArg.getValue();
     }
   catch (ArgException &e)  // catch any exceptions
@@ -231,7 +240,7 @@ void doSeg(const CmdLineType &CmdLineObj)
   // Now we do a second stage to look for the peak brightness.
   // Only makes sense when the first stage was looking for the 
   // inner fat layer
-  writeIm<MaskImType>(Select->GetOutput(), "/tmp/stage1.nii.gz");
+  // writeIm<MaskImType>(Select->GetOutput(), "/tmp/stage1.nii.gz");
 
   itk::Instance< itk::SmoothingRecursiveGaussianImageFilter <ImageType, ImageType> > Grad2;
   Grad2->SetInput(T1);
@@ -273,9 +282,81 @@ void doSeg(const CmdLineType &CmdLineObj)
   Select2->SetInsideValue(1);
   Select2->SetOutsideValue(0);
 
-  writeIm<MaskImType>(Select2->GetOutput(), CmdLineObj.OutputIm);
-  writeIm<ImageType>(gradient2, "/tmp/grad2.nii.gz");
-  writeIm<MaskImType>(Comb2->GetOutput(), "/tmp/marker2.nii.gz");
+  // Yet another stage - we're looking for skin boundary - a negative
+  // edge. Trick is for the dilation to push the latest result over
+  // the edge. There are two problems - first, we don't know how big
+  // the fat layer is, and it varies. Idea will be to apply a label
+  // dilate to both original background and most recently selected
+  // foreground. This will split the gap when they are close. Then
+  // need to reset the background marker.
+
+  // could reuse the previous calculation, but keep it simple
+  itk::Instance< itk::DirectionalGradientImageFilter<ImageType, MaskImType, ImageType> > GradD2;
+  GradD2->SetInput(T1);
+  GradD2->SetMaskImage(HEADDilate->GetOutput());
+  GradD2->SetOutsideValue(0);
+  // thresholding will stop the negative edges influencing the                                        
+  // smoothing                                                                                         
+
+  itk::Instance< itk::ThresholdImageFilter< ImageType > > DGThresh2;
+  DGThresh2->SetInput(GradD2->GetOutput());
+  DGThresh2->ThresholdBelow(0);
+  DGThresh2->SetLower(0);
+
+  itk::Instance< itk::SmoothingRecursiveGaussianImageFilter <ImageType, ImageType> > Grad3;
+  Grad3->SetInput(DGThresh2->GetOutput());
+  Grad3->SetSigma(CmdLineObj.smoothsize);
+
+
+  // new marker - stage 1 result and initial background
+  // need to be careful, as the fat layer is sometimes very close to
+  // the surface. Perhaps we need to split the difference between the
+  // previous segmentation and the outside marker.
+  // Perhaps this is a use case for the spatially variable dilation!
+  // To save chasing around after code, just do a label dilate to
+  // split the difference! Will need to reset the background label
+  itk::Instance<itk::MaximumImageFilter<MaskImType, MaskImType, MaskImType> >Comb3;
+  Comb3->SetInput(Select2->GetOutput());
+  Comb3->SetInput2(Invert->GetOutput());
+
+  // This will sensibly dilate labels so that they touch in narrow zones
+  itk::Instance<itk::LabelSetDilateImageFilter<MaskImType> > FatDilate;
+  FatDilate->SetInput(Comb3->GetOutput());
+  FatDilate->SetRadius(CmdLineObj.dilatesize2);
+  FatDilate->SetUseImageSpacing(true);
+
+  // Now reset the original background
+  itk::Instance<itk::BinaryThresholdImageFilter<MaskImType,MaskImType> > SelectFG;
+  SelectFG->SetInput(FatDilate->GetOutput());
+  SelectFG->SetUpperThreshold(1);
+  SelectFG->SetLowerThreshold(1);
+  SelectFG ->SetInsideValue(1);
+  SelectFG->SetOutsideValue(0);
+
+  itk::Instance<itk::MaximumImageFilter<MaskImType, MaskImType, MaskImType> >Comb4;
+  Comb4->SetInput(SelectFG->GetOutput());
+  Comb4->SetInput2(Invert->GetOutput());
+
+
+  itk::Instance<itk::MorphologicalWatershedFromMarkersImageFilter<ImageType, MaskImType> > WS3;
+  WS3->SetInput(Grad3->GetOutput());
+  WS3->SetMarkerImage(Comb4->GetOutput());
+  WS3->SetMarkWatershedLine(false);
+
+  itk::Instance<itk::BinaryThresholdImageFilter<MaskImType,MaskImType> > Select3;
+  Select3->SetInput(WS3->GetOutput());
+  Select3->SetUpperThreshold(1);
+  Select3->SetLowerThreshold(1);
+  Select3->SetInsideValue(1);
+  Select3->SetOutsideValue(0);
+
+  writeIm<MaskImType>(Select3->GetOutput(), CmdLineObj.OutputIm);
+  writeIm<ImageType>(Grad3->GetOutput(), "/tmp/grad3.nii.gz");
+  writeIm<MaskImType>(Comb4->GetOutput(), "/tmp/marker3.nii.gz");
+
+  writeImDbg<MaskImType>(Select->GetOutput(), "surf_innerfat");
+  writeImDbg<MaskImType>(Select2->GetOutput(), "surf_peakfat");
+  writeImDbg<MaskImType>(Comb->GetOutput(), "surf_marker1");
 
 }
 

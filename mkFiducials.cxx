@@ -131,7 +131,7 @@ void doSeg(const CmdLineType &CmdLineObj)
   // writeIm<MaskImType>(smClose->GetOutput(), CmdLineObj.OutputIm);
   // return;
 
-  itk::Instance<itk::BinaryOpenParaImageFilter<MaskImType> > firstsmOpen;
+  //itk::Instance<itk::BinaryOpenParaImageFilter<MaskImType> > firstsmOpen;
 
   // firstsmOpen->SetInput(smClose->GetOutput());
   // firstsmOpen->SetRadius(CmdLineObj.smallclose);
@@ -194,6 +194,14 @@ void doSeg(const CmdLineType &CmdLineObj)
     std::cout << labelObject->GetCentroid() << std::endl;
     }
   writeIm<MaskImType>(Biggest->GetOutput(), CmdLineObj.OutputIm);
+
+  writeImDbg<MaskImType>(Thresh->GetOutput(), "pinthresh");
+  writeImDbg<MaskImType>(smClose->GetOutput(), "pinsmclose");
+  writeImDbg<MaskImType>(lgClose->GetOutput(), "pinlgclose");
+  writeImDbg<MaskImType>(Diff->GetOutput(), "pindiff");
+  writeImDbg<MaskImType>(Masker->GetOutput(), "pinmask");
+  writeImDbg<MaskImType>(Biggest->GetOutput(), "pinbiggest");
+
 }
 
 int main(int argc, char * argv[])

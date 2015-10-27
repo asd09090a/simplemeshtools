@@ -1,5 +1,5 @@
 #Change PROJECT_NAME to the name of your project
-PROJECT(MANTiS)
+PROJECT(SurgeryAlignment)
 cmake_minimum_required(VERSION 2.8)
 # set the name of the input image used to run the test
 SET(INPUT_IMAGE ${CMAKE_CURRENT_SOURCE_DIR}/images/S01.native.mri.nii.gz)
@@ -24,7 +24,8 @@ SET(Required_Packages
 INCLUDE_DIRECTORIES(
   ${CMAKE_CURRENT_SOURCE_DIR}
   ${CMAKE_CURRENT_SOURCE_DIR}/tclap-code/include/
-   ${CMAKE_CURRENT_SOURCE_DIR}/DirectionalGradient
+  ${CMAKE_CURRENT_SOURCE_DIR}/DirectionalGradient/
+  ${CMAKE_CURRENT_SOURCE_DIR}/LabelErodeDilate/include/
 )
 #this foreach loads all of the packages that you specified as required.
 #It shouldn't need to be modified.
@@ -73,7 +74,7 @@ ENDIF(BUILD_WRAPPERS)
 #You can build more than one executable per project
 
 
-FOREACH(CurrentExe  "mkFiducials" "mkHeadMask" "mkSurf")
+FOREACH(CurrentExe  "mkFiducials" "mkHeadMask" "mkSurf" "mkSurf2" "segEyes")
 
 ADD_EXECUTABLE(${CurrentExe} ${CurrentExe}.cxx)
 TARGET_LINK_LIBRARIES(${CurrentExe} ${Libraries})
