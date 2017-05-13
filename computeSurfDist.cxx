@@ -5,6 +5,7 @@
 #include "vtkPolyDataReader.h"
 #include <vtkDistancePolyDataFilter.h>
 #include <itkSmartPointer.h>
+#include <vtkTriangleFilter.h>
 
 namespace itk
 {
@@ -77,12 +78,17 @@ int main(int argc, char * argv[])
   vtkReader2->SetFileName(CmdLineObj.InputMesh2.c_str());
   vtkReader2->Update();
 
+  vtkSmartPointer<vtkTriangleFilter> tf1 = vtkSmartPointer<vtkTriangleFilter>::New();
+  vtkSmartPointer<vtkTriangleFilter> tf2 = vtkSmartPointer<vtkTriangleFilter>::New();
+
+  tf1->SetInputConnection(vtkReader1->GetOutputPort());
+  tf2->SetInputConnection(vtkReader2->GetOutputPort());
+
   vtkSmartPointer<vtkDistancePolyDataFilter> distfilt = vtkSmartPointer<vtkDistancePolyDataFilter>::New();
 
   distfilt->ComputeSecondDistanceOn();
-  distfilt->SetInputConnection(0, vtkReader1->GetOutputPort());
-  distfilt->SetInputConnection(1, vtkReader2->GetOutputPort());
-
+  distfilt->SetInputConnection(0, tf1->GetOutputPort());
+  distfilt->SetInputConnection(1, tf2->GetOutputPort());
 
   vtkPolyDataWriter* writer1 = vtkPolyDataWriter::New();
   writer1->SetFileTypeToBinary(); //sets vtk polydata to binary
