@@ -21,3 +21,6 @@ Clone, as normal, then initialise the submodules:
 git submodule init
 git submodule update
 ```
+
+You also need an ITK installation with the _ParabolicMorphology_
+remote module enabled. 
