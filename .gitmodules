@@ -3,4 +3,4 @@
 	url = git://git.code.sf.net/p/tclap/code
 [submodule "DirectionalGradient"]
 	path = DirectionalGradient
-	url = git@github.com:richardbeare/DirectionalGradient.git
+	url = https://github.com/richardbeare/DirectionalGradient.git
