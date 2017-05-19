@@ -115,7 +115,17 @@ public:
   itkSetMacro(MeshSmoothingFeatureEdgeSmoothing, bool);
   itkSetMacro(MeshSmoothingBoundarySmoothing, bool);
 
+  /* stuff that ITK expects */
+  itkSetMacro(Debug, bool);
+  itkGetMacro(Debug, bool);
+  virtual const char *GetNameOfClass() const ITK_OVERRIDE
+    {                                        
+      return("VTKMeshPipeline");
+    }
+
 private:
+
+  bool m_Debug;
   bool m_UseGaussianSmoothing;
   bool m_UseDecimation;
   bool m_UseMeshSmoothing;

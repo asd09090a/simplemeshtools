@@ -137,6 +137,7 @@ VTKMeshPipeline<ImageType>
   this->SetMeshSmoothingFeatureAngle(45);
   this->SetMeshSmoothingFeatureEdgeSmoothing(false);
   this->SetMeshSmoothingBoundarySmoothing(false);
+  this->SetDebug(false);
 }
 template<class ImageType>
 VTKMeshPipeline<ImageType>
