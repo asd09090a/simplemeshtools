@@ -118,7 +118,7 @@ public:
   /* stuff that ITK expects */
   itkSetMacro(Debug, bool);
   itkGetMacro(Debug, bool);
-  virtual const char *GetNameOfClass() const ITK_OVERRIDE
+  virtual const char *GetNameOfClass() const
     {                                        
       return("VTKMeshPipeline");
     }
